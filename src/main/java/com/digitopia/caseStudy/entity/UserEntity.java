@@ -1,7 +1,9 @@
 package com.digitopia.caseStudy.entity;
 
 
+import com.digitopia.caseStudy.dto.IndustryDto;
 import com.digitopia.caseStudy.status.UserStatus;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
@@ -34,12 +36,18 @@ public class UserEntity extends BaseEntity {
     @Column(name="normalized_name",length = 100)
     private String normalizedName;
 
+
     @ManyToMany(fetch = FetchType.EAGER )
+
     @JoinTable(
-            name = "USER_ORGANIZATION_TABLE",
-            joinColumns = @JoinColumn(name = "USER_ID",referencedColumnName = "id"),
-            inverseJoinColumns = @JoinColumn(name = "ORGANIZATION_ID",referencedColumnName = "id"))
-    private List<OrganizationEntity> organizations;
+            name = "USER_INDUSTRY_TABLE",
+            joinColumns ={ @JoinColumn(name = "USER_ID",referencedColumnName = "ID")},
+            inverseJoinColumns = {@JoinColumn(name = "INDUSTRY_ID",referencedColumnName = "ID")})
+    private List<IndustryEntity> industries;
+
+
+
+
 
 
 }

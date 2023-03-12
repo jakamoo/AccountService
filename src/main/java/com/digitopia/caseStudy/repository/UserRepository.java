@@ -1,6 +1,5 @@
 package com.digitopia.caseStudy.repository;
 
-import com.digitopia.caseStudy.entity.OrganizationEntity;
 import com.digitopia.caseStudy.entity.UserEntity;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,14 +15,11 @@ public interface UserRepository extends CrudRepository<UserEntity, Long> {
     @Modifying
     @Query("update UserEntity u set u.createdDate = ?1, u.updatedDate = ?2")
     void updateCreatedDateAndUpdatedDateBy(Date createdDate, Date updatedDate);
-    @Transactional
-    @Modifying
-    @Query("update UserEntity u set u.id = ?1")
-    int updateIdBy(Long id);
-    Optional<UserEntity> findById(Long id);
-    List<UserEntity> findByNormalizedNameContaining(String normalizedName);
-    Optional<UserEntity>  findByEmail(String email);
 
+    Optional<UserEntity> findById(Long id);
+    Optional<UserEntity>  findByEmail(String email);
+    List<UserEntity>findAll();
+    List<UserEntity> findAllById(Iterable<Long> id);
 
     List<UserEntity> findAllByNormalizedName(String normalizedName);
 }

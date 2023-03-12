@@ -1,18 +1,20 @@
 package com.digitopia.caseStudy.service;
 
-import com.digitopia.caseStudy.dto.OrganizationDto;
+import com.digitopia.caseStudy.dto.IndustryDto;
 import com.digitopia.caseStudy.dto.UserDto;
-import com.digitopia.caseStudy.entity.OrganizationEntity;
+import com.digitopia.caseStudy.entity.IndustryEntity;
 import com.digitopia.caseStudy.entity.UserEntity;
-import com.digitopia.caseStudy.repository.OrganizationRepository;
+import com.digitopia.caseStudy.exception.UserSameMailAdressExistException;
+import com.digitopia.caseStudy.map.IndustryMapper;
+import com.digitopia.caseStudy.map.UserMapper;
+import com.digitopia.caseStudy.repository.IndustryRepository;
 import com.digitopia.caseStudy.repository.UserRepository;
+import com.digitopia.caseStudy.status.UserStatus;
 import com.sun.jdi.InternalException;
 import lombok.AllArgsConstructor;
-import org.modelmapper.ModelMapper;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 
+
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,28 +22,37 @@ import java.util.stream.Collectors;
 @Service
 @AllArgsConstructor
 public class UserService {
+
     private final UserRepository userRepository;
-    private final ModelMapper modelMapper;
-    private final OrganizationRepository organizationRepository;
+
+    private final IndustryMapper industryMapper;
+
+
+    private final IndustryRepository industryRepository;
+
+    private final UserMapper userMapper;
+
+
+
+
 
 
     public List<UserDto> getUsers(){
 
-        List<UserEntity> userEntities = (List<UserEntity>) userRepository.findAll();
+        List<UserEntity> userEntities =  userRepository.findAll();
 
-        return userEntities.stream()
-                .map(userEntity -> modelMapper.map(userEntity, UserDto.class))
-                .collect(Collectors.toList());
+       return userMapper.convertToDto(userEntities);
+
 
     }
 
-    public List<OrganizationDto> getOrganizations(Long id){
+    public List<IndustryDto> getIndustries(Long id){
 
         Optional<UserEntity> userEntity = userRepository.findById(id);
 
         if(userEntity.isPresent()){
 
-            return userEntity.get().getOrganizations().stream().map(organizationEntity -> modelMapper.map(organizationEntity, OrganizationDto.class)).collect(Collectors.toList());
+            return industryMapper.convertToDto(userEntity.get().getIndustries());
         }
 
         else
@@ -54,40 +65,60 @@ public class UserService {
     public void createUser(UserDto userDto,Long creatorId) {
 
         try {
-            UserEntity userEntity = modelMapper.map(userDto, UserEntity.class);
-
+            UserEntity userEntity = userMapper.convertToEntity(userDto);
             userEntity.setCreatedBy(creatorId);
             userEntity.setCreatedDate(new Date());
             userEntity.setUpdatedBy(0L);
             userEntity.setUpdatedDate(null);
             userEntity.setNormalizedName(normalizeName(userEntity.getFullName()));
-            userEntity.setOrganizations(null);
+            userEntity.setStatus(UserStatus.ACTIVE);
+
+            if(!industryValidator(userDto).isEmpty()){
+                throw new IllegalArgumentException("Invitation IDs not found: " + industryValidator(userDto));
+
+            }
 
 
-            List<Long> organizationIds = userDto.getOrganizationIds();
-            List<OrganizationEntity> organizationEntities = organizationRepository.findAllById(organizationIds);
-            userEntity.setOrganizations(organizationEntities);
 
-            UserDto returnUserDto = modelMapper.map(userRepository.save(userEntity), UserDto.class);
-            returnUserDto.setOrganizationIds(organizationIds);
+            userRepository.save(userEntity);
+
+        } catch (IllegalArgumentException e){
+            throw new RuntimeException(e.getMessage());
+
+        }catch (RuntimeException e) {
+
+            throw new RuntimeException(e.getMessage());
         }
-        catch (Exception e){
 
-            throw new InternalException();
+        catch (Exception e) {
+
+            throw new UserSameMailAdressExistException("There is user already defined with same email.");
         }
-
-
-
 
     }
 
 
+    public List<Long> industryValidator(UserDto userDto){
+
+        List<Long> industryIds=userDto.getIndustryIds();
+        List<IndustryEntity> industryEntities = industryRepository.findAllById(industryIds);
 
 
+        List<Long> foundIds = industryEntities.stream()
+                .map(IndustryEntity::getId)
+                .collect(Collectors.toList());
+
+        List<Long> notFoundIds = industryIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .collect(Collectors.toList());
 
 
+        return notFoundIds;
+
+    }
 
     private String normalizeName(String name) {
+
         return name.toLowerCase().replaceAll("[^a-z ]+", "");
     }
 
@@ -104,22 +135,22 @@ public class UserService {
 
     public List<UserDto> findUsersByNormalizedName(String normalizedName) {
         List<UserEntity> userEntities = userRepository.findAllByNormalizedName(normalizedName);
-        return userEntities.stream()
-                .map(userEntity -> modelMapper.map(userEntity, UserDto.class))
-                .collect(Collectors.toList());
+        return userMapper.convertToDto(userEntities);
     }
 
     public  UserDto getUserByEmail(String email) {
-      Optional<UserEntity> userEntity = userRepository.findByEmail(email);
+        Optional<UserEntity> userEntity = userRepository.findByEmail(email);
+
 
         if(userEntity.isPresent()){
-
-            return  modelMapper.map(userEntity, UserDto.class);
+            return  userMapper.convertToDto(userEntity.get());
         }
 
         else
             throw new RuntimeException("User Not Found");
     }
+
+
 
 
     public void updateUser(Long creatorId, UserDto newUser, Long olUserId) {
@@ -134,14 +165,20 @@ public class UserService {
 
             UserEntity oldUser = user.get();
             oldUser.setFullName(newUser.getFullName());
-            oldUser.setStatus(newUser.getStatus());
             oldUser.setNormalizedName(normalizeName(newUser.getFullName()));
             oldUser.setEmail(newUser.getEmail());
             oldUser.setUpdatedDate(new Date());
             oldUser.setUpdatedBy(creatorId);
-            oldUser.setCreatedDate(new Date());
-            oldUser.setCreatedBy(creatorId);
+
+            if(!industryValidator(newUser).isEmpty())
+
+                throw new IllegalArgumentException("Following Industry ids not found: " + industryValidator(newUser));
+
             userRepository.save(oldUser);
+
+
+
+
         }
     }
 }
